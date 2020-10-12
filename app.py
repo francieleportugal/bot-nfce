@@ -29,7 +29,42 @@ def url_validator(url):
 def scraper(url):
     page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
-    print(soup)
+
+    table = soup.find('table', attrs={'id': 'tabResult'})
+    rows = table.findAll('tr')
+
+    data = []
+    for row in rows:
+        print ('------------------')
+        cols = row.find_all('td')
+        product = dict()
+
+        for tag in cols:
+            print ('product: ', product)
+            product = dict()
+
+            name = tag.find('span', attrs={'class': 'txtTit'})
+            code = tag.find('span', attrs={'class': 'RCod'})
+            amount = tag.find('span', attrs={'class': 'Rqtd'})
+            unitaryValue = tag.find('span', attrs={'class': 'RvlUnit'})
+            total = tag.find('span', attrs={'class': 'valor'})
+
+            if name:
+                print ('Name: ', name.get_text())
+                product['name'] = name.get_text()
+            if code:
+                print ('Code: ', code.get_text().split(':')[1].split(')')[0])
+                product['code'] = code.get_text().split(':')[1].split(')')[0]
+            if amount:
+                print ('Amount: ', amount.get_text().split(':')[1])
+                product['amount'] = amount.get_text().split(':')[1]
+            if unitaryValue:
+                print ('Unitary Value: ', unitaryValue.get_text().split(':')[1])
+                product['unitaryValue'] = unitaryValue.get_text().split(':')[1]
+            if total:
+                print ('total: ', total.get_text())
+                product['total'] = total.get_text()
+        
 
 def handler(msg):
     content_type, chat_type, chat_id = telepot.glance(msg)
