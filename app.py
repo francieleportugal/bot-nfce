@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from telepot.loop import MessageLoop
 import constants
+import unidecode
 
 TOKEN = config('TOKEN')
 NfceBot = telepot.Bot(TOKEN)
@@ -27,22 +28,49 @@ def url_validator(url):
         return False
 
 def scraper(url):
+    data = {
+        'establishment': None,
+        'date': None,
+        'products': [],
+    }
+
     page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
+
+    establishment = soup.find('div', attrs={'class': 'txtTopo'})
+
+    if establishment:
+        data['establishment'] = establishment.get_text()
+    
+    infoGeneral = soup.find('ul')
+
+    for strongTag in infoGeneral.find_all('strong'):
+
+        # Normalize text
+        strongTagText = strongTag.text
+        strongTagText = strongTagText.replace(' ', '')
+        strongTagText = strongTagText.replace(':', '')
+        strongTagText = strongTagText.lower()
+        strongTagText = unidecode.unidecode(strongTagText)
+
+        if strongTagText == 'emissao':
+            data['date'] = strongTag.next_sibling.split(' ')[0]
 
     table = soup.find('table', attrs={'id': 'tabResult'})
     rows = table.findAll('tr')
 
-    data = []
     for row in rows:
-        print ('------------------')
+        product = {
+            'name': None,
+            'code': None,
+            'amount': None,
+            'unitaryValue': None,
+            'total': None,
+        }
+
         cols = row.find_all('td')
-        product = dict()
 
         for tag in cols:
-            print ('product: ', product)
-            product = dict()
-
             name = tag.find('span', attrs={'class': 'txtTit'})
             code = tag.find('span', attrs={'class': 'RCod'})
             amount = tag.find('span', attrs={'class': 'Rqtd'})
@@ -50,21 +78,20 @@ def scraper(url):
             total = tag.find('span', attrs={'class': 'valor'})
 
             if name:
-                print ('Name: ', name.get_text())
                 product['name'] = name.get_text()
             if code:
-                print ('Code: ', code.get_text().split(':')[1].split(')')[0])
                 product['code'] = code.get_text().split(':')[1].split(')')[0]
             if amount:
-                print ('Amount: ', amount.get_text().split(':')[1])
                 product['amount'] = amount.get_text().split(':')[1]
             if unitaryValue:
-                print ('Unitary Value: ', unitaryValue.get_text().split(':')[1])
-                product['unitaryValue'] = unitaryValue.get_text().split(':')[1]
+                product['unitaryValue'] = unitaryValue.get_text().split(':')[1]            
             if total:
-                print ('total: ', total.get_text())
                 product['total'] = total.get_text()
         
+        data['products'].append(product)
+
+    return data
+
 
 def handler(msg):
     content_type, chat_type, chat_id = telepot.glance(msg)

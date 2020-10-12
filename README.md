@@ -9,6 +9,8 @@ Bot for web scraping of NFC-e data.
 
 ```pip3 install beautifulsoup4```
 
+```pip3 install unidecode```
+
 ## Run
 
 ```python3 app.py```
