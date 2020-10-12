@@ -1,12 +1,14 @@
+import os
+import csv
 import time
 import telepot
 import requests
+import unidecode
+import constants
 from decouple import config
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from telepot.loop import MessageLoop
-import constants
-import unidecode
 
 TOKEN = config('TOKEN')
 NfceBot = telepot.Bot(TOKEN)
@@ -19,6 +21,9 @@ def error_command(chatId):
 
 def error_url_invalid(chatId):
     NfceBot.sendMessage(chatId, constants.MSG_URL_INVALID)
+
+def error_handler(chatId):
+    NfceBot.sendMessage(chatId, constants.MSG_ERROR_HANDLER)
 
 def url_validator(url):
     try:
@@ -92,21 +97,58 @@ def scraper(url):
 
     return data
 
+def generate_spreadsheet(nameFile, data):
+    if os.path.exists(nameFile):
+        os.remove(nameFile)
 
+    file = open(nameFile, 'a', encoding='utf-8')
+
+    file.write('ESTABLISHMENT' + ';' + data['establishment'] + '\n')
+    file.write('DATE' + ';' + data['date'] + '\n')
+    file.write('\n')
+    file.write('NAME' + ';' + 'CODE' + ';' + 'AMOUNT' + ';' + 'UNITARY VALUE' + ';' + 'TOTAL' +'\n')
+
+    for product in data['products']:
+        file.write(
+            product['name'] + ';' +
+            product['code'] + ';' +
+            product['amount'] + ';' +
+            product['unitaryValue'] + ';' +
+            product['total'] +'\n'
+        )
+
+    file.close()
+
+def send_document(chatId, nameFile):
+    NfceBot.sendDocument(chatId, open(nameFile, 'rb'))    
+    
 def handler(msg):
-    content_type, chat_type, chat_id = telepot.glance(msg)
-    print(content_type, chat_type, chat_id)
+    try:
+        content_type, chat_type, chat_id = telepot.glance(msg)
 
-    if content_type == 'text':
-        if msg['text'] == '/start':
-            start(chat_id)
-        else:
-            if url_validator(msg['text']):
-                scraper(msg['text'])
+        if content_type == 'text':
+            if msg['text'] == '/start':
+                start(chat_id)
             else:
-                error_url_invalid(chat_id)
-    else:
-        error_command(chat_id)
+                if url_validator(msg['text']):
+                    data = scraper(msg['text'])
+
+                    if data:
+                        nameFile = data['establishment'] + '-' + data['date']
+                        nameFile = nameFile.replace(' ', '-')
+                        nameFile = nameFile.replace('/', '-')
+                        nameFile = nameFile.lower()
+                        nameFile = unidecode.unidecode(nameFile)
+                        nameFile = nameFile + '.csv'
+
+                        generate_spreadsheet(nameFile, data)
+                        send_document(chat_id, nameFile)
+                else:
+                    error_url_invalid(chat_id)
+        else:
+            error_command(chat_id)
+    except:
+        error_handler(chat_id)
 
 
 
