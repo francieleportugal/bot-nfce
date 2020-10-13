@@ -35,6 +35,7 @@ def url_validator(url):
 def scraper(url):
     data = {
         'establishment': None,
+        'cnpj': None,
         'date': None,
         'products': [],
     }
@@ -45,21 +46,31 @@ def scraper(url):
     establishment = soup.find('div', attrs={'class': 'txtTopo'})
 
     if establishment:
-        data['establishment'] = establishment.get_text()
+        data['establishment'] = establishment.get_text(strip=True).encode('utf-8').decode('utf-8')
+        data['establishment'] = data['establishment'].replace(',', ' ')
+
+    cnpj = soup.find('div', attrs={'class': 'text'})
+
+    if cnpj:
+        data['cnpj'] = cnpj.get_text(strip=True).encode('utf-8').decode('utf-8').split(':')[1]
+        data['cnpj'] = data['cnpj'].strip()
+        data['cnpj'] = data['cnpj'].replace('\r','')
+        data['cnpj'] = data['cnpj'].replace('\n','')
     
     infoGeneral = soup.find('ul')
 
     for strongTag in infoGeneral.find_all('strong'):
 
         # Normalize text
-        strongTagText = strongTag.text
+        strongTagText = strongTag.text.encode('utf-8').decode('utf-8')
         strongTagText = strongTagText.replace(' ', '')
         strongTagText = strongTagText.replace(':', '')
         strongTagText = strongTagText.lower()
         strongTagText = unidecode.unidecode(strongTagText)
 
         if strongTagText == 'emissao':
-            data['date'] = strongTag.next_sibling.split(' ')[0]
+            data['date'] = strongTag.next_sibling.split(' ')[0].encode('utf-8').decode('utf-8')
+            data['date'] = data['date'].replace(',', ' ')
 
     table = soup.find('table', attrs={'id': 'tabResult'})
     rows = table.findAll('tr')
@@ -83,15 +94,21 @@ def scraper(url):
             total = tag.find('span', attrs={'class': 'valor'})
 
             if name:
-                product['name'] = name.get_text()
+                product['name'] = name.get_text(strip=True).encode('utf-8').decode('utf-8')
+                product['name'] = product['name'].replace(',', ' ')
             if code:
-                product['code'] = code.get_text().split(':')[1].split(')')[0]
+                product['code'] = code.get_text(strip=True).split(':')[1].split(')')[0].encode('utf-8').decode('utf-8')
+                product['code'] = product['code'].replace(',', '')
+                product['code'] = product['code'].strip('')
             if amount:
-                product['amount'] = amount.get_text().split(':')[1]
+                product['amount'] = amount.get_text(strip=True).split(':')[1].encode('utf-8').decode('utf-8')
+                product['amount'] = product['amount'].replace(',', ' ')
             if unitaryValue:
-                product['unitaryValue'] = unitaryValue.get_text().split(':')[1]            
+                product['unitaryValue'] = unitaryValue.get_text(strip=True).split(':')[1].encode('utf-8').decode('utf-8') 
+                product['unitaryValue'] = product['unitaryValue'].replace(',', '.')
             if total:
-                product['total'] = total.get_text()
+                product['total'] = total.get_text(strip=True).encode('utf-8').decode('utf-8')
+                product['total'] = product['total'].replace(',', '.')
         
         data['products'].append(product)
 
@@ -103,17 +120,18 @@ def generate_spreadsheet(nameFile, data):
 
     file = open(nameFile, 'a', encoding='utf-8')
 
-    file.write('ESTABLISHMENT' + ';' + data['establishment'] + '\n')
-    file.write('DATE' + ';' + data['date'] + '\n')
+    file.write('CNPJ' + ',' + data['cnpj'] + '\n')
+    file.write('ESTABLISHMENT' + ',' + data['establishment'] + '\n')
+    file.write('DATE' + ',' + data['date'] + '\n')
     file.write('\n')
-    file.write('NAME' + ';' + 'CODE' + ';' + 'AMOUNT' + ';' + 'UNITARY VALUE' + ';' + 'TOTAL' +'\n')
+    file.write('NAME' + ',' + 'CODE' + ',' + 'AMOUNT' + ',' + 'UNITARY VALUE' + ',' + 'TOTAL' +'\n')
 
     for product in data['products']:
         file.write(
-            product['name'] + ';' +
-            product['code'] + ';' +
-            product['amount'] + ';' +
-            product['unitaryValue'] + ';' +
+            product['name'] + ',' +
+            product['code'] + ',' +
+            product['amount'] + ',' +
+            product['unitaryValue'] + ',' +
             product['total'] +'\n'
         )
 
